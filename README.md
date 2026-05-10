@@ -5,7 +5,7 @@ Alpha drop of the Board Web SDK for partners building **web apps that run on Boa
 ## How the pieces fit together
 
 ```
-Board device (or the harness APK in this bundle, on any Android 10+)
+Board device (or the harness APK in this bundle, on arm64 Android 10+)
   └─ WebView, with bridge injected by the host
       └─ Your web app
           └─ import { Board } from "@harrishill/board-sdk"
@@ -22,7 +22,7 @@ Anywhere `window.BoardSDK` is present, `Board.isOnDevice` is `true` and the SDK 
 | `harrishill-board-sdk-0.1.0.tgz` | The SDK as an npm tarball. `example/`'s `package.json` already references it via `file:../harrishill-board-sdk-0.1.0.tgz`. |
 | `board-sdk/` | The same SDK as flat `.js` + `.d.ts` files, for non-bundler use (drop-in `<script type="module">`, Foundry-style modules, etc.). |
 | `sample/` | Android harness Gradle project. Bakes your `example/dist` into an APK and serves it in a WebView with the Board bridge injected. Vendored AAR under `sample/app/libs/`. |
-| `board-web-sdk-harness-debug.apk` | Pre-built APK of the harness with the included `example/` baked in. Sideload onto any Android 10+ device or emulator to sanity-check that the SDK works end-to-end before you start iterating. |
+| `board-web-sdk-harness-debug.apk` | Pre-built APK of the harness with the included `example/` baked in. Sideload onto an arm64 Android 10+ device or arm64 emulator image to sanity-check that the SDK works end-to-end before you start iterating. |
 
 ## Two ways to develop
 
@@ -36,11 +36,11 @@ npm run dev
 
 Opens at <http://localhost:5173>. `Board.isOnDevice` is `false` and the interactive sections are disabled. This mode is for layout, styling, wiring, and syntax-checking your SDK calls.
 
-### On a Board device (or the harness APK on any Android)
+### On a Board device (or the harness APK on arm64 Android)
 
 The bridge only exists inside a Board WebView. Two paths:
 
-1. **Pre-built harness APK.** Install `board-web-sdk-harness-debug.apk` on any Android 10+ device or emulator. The bundled example will load with `Board.isOnDevice === true`, so you can confirm bridges, touch input, and APIs all work before touching the build pipeline.
+1. **Pre-built harness APK.** Install `board-web-sdk-harness-debug.apk` on an arm64 Android 10+ device or arm64 emulator image. The bundled example will load with `Board.isOnDevice === true`, so you can confirm bridges, touch input, and APIs all work before touching the build pipeline.
 
 2. **Your own build through the harness.** When you want to iterate on your own code:
 
@@ -59,6 +59,8 @@ The bridge only exists inside a Board WebView. Two paths:
    ```
 
    The harness expects your web app's built output at `<bundle root>/example/dist`. Either keep your project named `example/` next to `sample/`, or edit the `from '../../example/dist'` line in `sample/app/build.gradle`.
+
+   The harness APK is arm64-only because the bundled native bridge AAR ships `arm64-v8a` libraries. The default x86_64 Android Emulator cannot install it unless matching x86_64 native artifacts are added.
 
    Set `-Pweb=raw` on the Gradle command to load `sample/app/src/main/assets/index.html` (a hand-rolled tabbed test page) instead of your built example — useful for poking the bridge directly without the TS SDK in the middle.
 

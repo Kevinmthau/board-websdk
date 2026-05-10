@@ -23,6 +23,8 @@ android {
         versionName "1.0"
 
         ndk {
+            // The vendored Board WebView AAR currently ships arm64-v8a
+            // native bridge libraries only.
             abiFilters 'arm64-v8a'
         }
 

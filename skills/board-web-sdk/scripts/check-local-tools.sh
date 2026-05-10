@@ -222,6 +222,18 @@ if need_harness; then
 
   if [[ -f "$ROOT_DIR/sample/app/libs/board-webview-general-debug.aar" ]]; then
     ok "Harness AAR exists"
+    if command -v unzip >/dev/null 2>&1; then
+      aar_abis="$(unzip -Z1 "$ROOT_DIR/sample/app/libs/board-webview-general-debug.aar" 2>/dev/null | awk -F/ '$1 == "jni" && $2 != "" && $NF ~ /\.so$/ {print $2}' | sort -u | paste -sd, -)"
+      if [[ "$aar_abis" == "arm64-v8a" ]]; then
+        warn "Harness native bridge is arm64-v8a only; use an arm64 Android 10+ device or emulator image"
+      elif [[ -n "$aar_abis" ]]; then
+        ok "Harness native ABIs: $aar_abis"
+      else
+        warn "Harness AAR contains no native ABI directories"
+      fi
+    else
+      warn "unzip is not on PATH; cannot inspect harness native ABIs"
+    fi
   else
     miss "sample/app/libs/board-webview-general-debug.aar is missing"
   fi
