@@ -1,0 +1,8 @@
+.gradle/
+build/
+app/build/
+local.properties
+
+# Generated at build time by the copyExampleAssets gradle task — the
+# source of truth is ../example/ and its npm-built dist/ folder.
+app/src/main/assets/example/

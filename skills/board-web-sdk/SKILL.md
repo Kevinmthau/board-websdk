@@ -56,11 +56,10 @@ if (Board.isOnDevice) {
 
 ## Build And Run
 
-Browser-only loop:
+Browser-only loop, after dependencies are already installed or the user approves installing them:
 
 ```bash
 cd example
-npm install
 npm run dev
 ```
 

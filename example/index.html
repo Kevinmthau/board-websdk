@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Board Web SDK Example</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="touch-canvas"></canvas>
+
+    <aside id="sidebar">
+      <header>
+        <h1>Board Web SDK</h1>
+        <div id="status"></div>
+      </header>
+
+      <section data-offline-disabled>
+        <h2>Session</h2>
+        <ul id="players"></ul>
+        <div class="row">
+          <button id="add-player-btn">Add player</button>
+          <button id="switcher-btn">Profile switcher</button>
+        </div>
+      </section>
+
+      <section data-offline-disabled>
+        <h2>Saves</h2>
+        <ul id="saves"></ul>
+        <div class="row">
+          <button id="create-save-btn">Create test save</button>
+          <button id="refresh-saves-btn">Refresh</button>
+        </div>
+      </section>
+
+      <section data-offline-disabled>
+        <h2>Pause menu</h2>
+        <div class="row">
+          <button id="configure-pause-btn">Configure context</button>
+          <button id="clear-pause-btn">Clear</button>
+        </div>
+        <pre id="pause-result"><em>No pause interaction yet</em></pre>
+      </section>
+
+      <p class="hint">
+        Touch the canvas to see contacts.
+        Finger = blue, piece (glyph) = pink with id.
+      </p>
+    </aside>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

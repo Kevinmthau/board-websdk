@@ -1,0 +1,2 @@
+rootProject.name = 'board-web-sdk-test'
+include ':app'

@@ -1,0 +1,84 @@
+plugins {
+    id 'com.android.application'
+}
+
+// URL selection for the harness WebView.
+//   ./gradlew assembleDebug                 -> loads the example (default)
+//   ./gradlew assembleDebug -Pweb=raw       -> loads the raw-bridge tester
+//   ./gradlew assembleDebug -Pweb=example   -> loads the example (explicit)
+def webTarget = (project.findProperty('web') ?: 'example').toString()
+def webUrl = webTarget == 'raw'
+        ? '/assets/index.html'
+        : '/assets/example/index.html'
+
+android {
+    namespace 'co.harrishill.board.websdktest'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'co.harrishill.board.websdktest'
+        minSdk 29
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+
+        buildConfigField "String", "WEB_URL", "\"${webUrl}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+    }
+}
+
+dependencies {
+    implementation(name: 'board-webview-general-debug', ext: 'aar')
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.webkit:webkit:1.8.0'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.annotation:annotation:1.7.0'
+    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+    implementation 'org.tensorflow:tensorflow-lite-metadata:0.4.4'
+}
+
+// Copy the web example's built output into the APK assets. The example lives
+// in ../../example/ as a Vite project; run `npm install && npm run build` there
+// before building the APK (or set -Pweb=raw to skip this).
+task copyExampleAssets(type: Copy) {
+    from '../../example/dist'
+    into 'src/main/assets/example'
+    doFirst {
+        if (!file('../../example/dist').exists()) {
+            throw new GradleException(
+                    "example/dist not found. Run: cd ../../example && npm install && npm run build\n" +
+                            "Or build the harness with -Pweb=raw to skip this step.")
+        }
+    }
+}
+
+if (webTarget == 'example') {
+    preBuild.dependsOn copyExampleAssets
+}
