@@ -1,0 +1,4 @@
+interface:
+  display_name: "Board Web SDK"
+  short_description: "Build Board games with local preflight checks"
+  default_prompt: "Use $board-web-sdk to create a Board-compatible web game."
