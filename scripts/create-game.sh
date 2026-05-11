@@ -306,6 +306,10 @@ if [ "$STATUS" -eq 1 ]; then
 fi
 
 if [ "$BUILD_WEB" -eq 1 ]; then
+    if [ ! -d "$ROOT_DIR/web/node_modules" ]; then
+        printf 'Installing web dependencies...\n'
+        (cd "$ROOT_DIR/web" && npm install)
+    fi
     (cd "$ROOT_DIR/web" && npm run build)
 fi
 
