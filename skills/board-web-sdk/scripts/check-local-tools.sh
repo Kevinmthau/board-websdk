@@ -201,6 +201,10 @@ if need_harness; then
   path_java_problem=""
   path_javac_problem=""
   gradle_java_home="$(awk -F= '/^org.gradle.java.home=/ {print $2}' "$ROOT_DIR/sample/gradle.properties" 2>/dev/null || true)"
+  gradle_java_home_ok=false
+  if [[ -n "$gradle_java_home" ]] && valid_jdk_home "$gradle_java_home"; then
+    gradle_java_home_ok=true
+  fi
 
   if command -v java >/dev/null 2>&1; then
     major="$(java_major)"
@@ -231,6 +235,9 @@ if need_harness; then
   if [[ "$path_java_ok" == true && "$path_javac_ok" == true ]]; then
     ok "Java runtime $path_java_version"
     ok "javac $path_javac_version"
+  elif [[ "$path_java_ok" == true && "$gradle_java_home_ok" == true ]]; then
+    ok "Java runtime $path_java_version"
+    warn "javac is not fully usable from PATH (${path_javac_problem:-javac OK}); Gradle will use sample/gradle.properties org.gradle.java.home"
   else
     detected_jdk_home="$(detect_jdk_home || true)"
     if [[ -n "$detected_jdk_home" ]]; then
