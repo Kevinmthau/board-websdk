@@ -46,7 +46,6 @@ if (!Board.isOnDevice) {
 function wireTouchCanvas(source: "board" | "simulated"): void {
   const canvas = document.getElementById("touch-canvas") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
-  const fingerContacts = new Map<number, SurfaceContact>();
   const glyphContacts = new Map<number, SurfaceContact>();
 
   function resize(): void {
@@ -60,11 +59,14 @@ function wireTouchCanvas(source: "board" | "simulated"): void {
 
   function applyFrame(contacts: ReadonlyArray<SurfaceContact>): void {
     for (const c of contacts) {
-      const map = c.type === BoardContactType.Glyph ? glyphContacts : fingerContacts;
+      if (c.type !== BoardContactType.Glyph) {
+        continue;
+      }
+
       if (c.phase === BoardContactPhase.Ended || c.phase === BoardContactPhase.Canceled) {
-        map.delete(c.contactId);
+        glyphContacts.delete(c.contactId);
       } else {
-        map.set(c.contactId, c);
+        glyphContacts.set(c.contactId, c);
       }
     }
     draw();
@@ -72,24 +74,16 @@ function wireTouchCanvas(source: "board" | "simulated"): void {
 
   function draw(): void {
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-    for (const c of fingerContacts.values()) {
-      drawContact(c);
-    }
     for (const c of glyphContacts.values()) {
       drawContact(c);
     }
   }
 
   function drawContact(c: SurfaceContact): void {
-    const isPiece = c.type === BoardContactType.Glyph;
-    ctx.fillStyle = isPiece ? "rgba(255, 107, 157, 0.85)" : "rgba(0, 210, 255, 0.85)";
+    ctx.fillStyle = "rgba(255, 107, 157, 0.85)";
     ctx.beginPath();
-    ctx.arc(c.x, c.y, isPiece ? 28 : 20, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, 28, 0, Math.PI * 2);
     ctx.fill();
-
-    if (!isPiece) {
-      return;
-    }
 
     const rad = (c.orientation * Math.PI) / 180;
     ctx.strokeStyle = "#fff";
