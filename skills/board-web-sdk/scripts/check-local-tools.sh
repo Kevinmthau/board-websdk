@@ -200,6 +200,9 @@ if need_harness; then
   path_javac_ok=false
   path_java_problem=""
   path_javac_problem=""
+  path_java_version=""
+  path_javac_version=""
+  java_home_jdk_ok=false
   gradle_java_home="$(awk -F= '/^org.gradle.java.home=/ {print $2}' "$ROOT_DIR/sample/gradle.properties" 2>/dev/null || true)"
   gradle_java_home_ok=false
   if [[ -n "$gradle_java_home" ]] && valid_jdk_home "$gradle_java_home"; then
@@ -217,6 +220,34 @@ if need_harness; then
   else
     path_java_problem="java is not on PATH"
   fi
+  gradlew_java_ok="$path_java_ok"
+  gradlew_java_version="$path_java_version"
+  gradlew_java_problem="$path_java_problem"
+  if [[ -n "${JAVA_HOME:-}" ]]; then
+    gradlew_java_ok=false
+    gradlew_java_version=""
+    gradlew_java_bin="$JAVA_HOME/bin/java"
+    if [[ -x "$JAVA_HOME/jre/sh/java" ]]; then
+      gradlew_java_bin="$JAVA_HOME/jre/sh/java"
+    fi
+    if valid_jdk_home "$JAVA_HOME"; then
+      java_home_jdk_ok=true
+    fi
+    if [[ -x "$gradlew_java_bin" ]]; then
+      gradlew_java_major="$(java_major "$gradlew_java_bin")"
+      if [[ "$gradlew_java_major" =~ ^[0-9]+$ && "$gradlew_java_major" -ge 17 ]]; then
+        gradlew_java_ok=true
+        gradlew_java_version="$(java_version "$gradlew_java_bin")"
+        if [[ "$java_home_jdk_ok" != true ]]; then
+          gradlew_java_problem="JAVA_HOME does not point to a JDK 17+ with bin/javac: $JAVA_HOME"
+        fi
+      else
+        gradlew_java_problem="JAVA_HOME java is not JDK 17+; version is ${gradlew_java_major:-unknown}"
+      fi
+    else
+      gradlew_java_problem="JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+    fi
+  fi
 
   if command -v javac >/dev/null 2>&1; then
     javac_output="$(javac -version 2>&1 || true)"
@@ -232,12 +263,16 @@ if need_harness; then
     path_javac_problem="javac is not on PATH"
   fi
 
-  if [[ "$path_java_ok" == true && "$path_javac_ok" == true ]]; then
-    ok "Java runtime $path_java_version"
+  if [[ "$gradlew_java_ok" == true && "$path_javac_ok" == true && ( -z "${JAVA_HOME:-}" || "$java_home_jdk_ok" == true ) ]]; then
+    ok "Java runtime $gradlew_java_version"
     ok "javac $path_javac_version"
-  elif [[ "$path_java_ok" == true && "$gradle_java_home_ok" == true ]]; then
-    ok "Java runtime $path_java_version"
-    warn "javac is not fully usable from PATH (${path_javac_problem:-javac OK}); Gradle will use sample/gradle.properties org.gradle.java.home"
+  elif [[ "$gradlew_java_ok" == true && "$gradle_java_home_ok" == true ]]; then
+    ok "Java runtime $gradlew_java_version"
+    if [[ -n "${JAVA_HOME:-}" && "$java_home_jdk_ok" != true ]]; then
+      warn "$gradlew_java_problem; Gradle will use sample/gradle.properties org.gradle.java.home"
+    else
+      warn "javac is not fully usable from PATH (${path_javac_problem:-javac OK}); Gradle will use sample/gradle.properties org.gradle.java.home"
+    fi
   else
     detected_jdk_home="$(detect_jdk_home || true)"
     if [[ -n "$detected_jdk_home" ]]; then
@@ -250,10 +285,10 @@ if need_harness; then
         action "JDK 17+ found at $detected_jdk_home, but Gradle will not use it by default; prompt before running: export JAVA_HOME='$detected_jdk_home'"
       fi
     else
-      if [[ "$path_java_ok" == true ]]; then
-        ok "Java runtime $path_java_version"
+      if [[ "$gradlew_java_ok" == true && ( -z "${JAVA_HOME:-}" || "$java_home_jdk_ok" == true ) ]]; then
+        ok "Java runtime $gradlew_java_version"
       else
-        miss "JDK 17+ required; $path_java_problem"
+        miss "JDK 17+ required; $gradlew_java_problem"
       fi
       if [[ "$path_javac_ok" == true ]]; then
         ok "javac $path_javac_version"
