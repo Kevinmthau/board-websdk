@@ -90,6 +90,60 @@ java_version() {
   "$java_bin" -version 2>&1 | awk -F '"' '/version/ {print $2; exit}'
 }
 
+javac_version() {
+  local javac_bin="${1:-javac}"
+  "$javac_bin" -version 2>&1 | awk '/javac/ {print $2; exit}'
+}
+
+javac_major() {
+  local javac_bin="${1:-javac}"
+  local version
+  version="$(javac_version "$javac_bin")"
+  printf '%s\n' "$version" | awk -F. '{if ($1 == "1") print $2; else print $1}'
+}
+
+valid_jdk_home() {
+  local java_home="$1"
+  local detected_java_major detected_javac_major
+
+  [[ -n "$java_home" ]] || return 1
+  [[ -x "$java_home/bin/java" ]] || return 1
+  [[ -x "$java_home/bin/javac" ]] || return 1
+
+  detected_java_major="$(java_major "$java_home/bin/java")"
+  detected_javac_major="$(javac_major "$java_home/bin/javac")"
+  [[ "$detected_java_major" =~ ^[0-9]+$ && "$detected_java_major" -ge 17 ]] || return 1
+  [[ "$detected_javac_major" =~ ^[0-9]+$ && "$detected_javac_major" -ge 17 ]] || return 1
+}
+
+detect_jdk_home() {
+  local candidate
+
+  if [[ -n "${JAVA_HOME:-}" && -d "${JAVA_HOME:-}" ]] && valid_jdk_home "$JAVA_HOME"; then
+    printf '%s\n' "$JAVA_HOME"
+    return 0
+  fi
+
+  if [[ -x /usr/libexec/java_home ]]; then
+    candidate="$(/usr/libexec/java_home -v 17 2>/dev/null || true)"
+    if [[ -n "$candidate" && -d "$candidate" ]] && valid_jdk_home "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  fi
+
+  for candidate in \
+    "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+    "$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home"; do
+    if [[ -d "$candidate" ]] && valid_jdk_home "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 detect_android_sdk() {
   for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
     if [[ -n "$candidate" && -d "$candidate" ]]; then
@@ -142,29 +196,59 @@ if need_browser; then
 fi
 
 if need_harness; then
+  path_java_ok=false
+  path_javac_ok=false
+  path_java_problem=""
+  path_javac_problem=""
+
   if command -v java >/dev/null 2>&1; then
     major="$(java_major)"
     if [[ "$major" =~ ^[0-9]+$ && "$major" -ge 17 ]]; then
-      ok "Java runtime $(java -version 2>&1 | awk -F '"' '/version/ {print $2; exit}')"
+      path_java_ok=true
+      path_java_version="$(java_version)"
     else
-      miss "JDK 17+ required; java version is ${major:-unknown}"
+      path_java_problem="java on PATH is not JDK 17+; version is ${major:-unknown}"
     fi
   else
-    miss "JDK 17+ is not installed or java is not on PATH"
+    path_java_problem="java is not on PATH"
   fi
 
   if command -v javac >/dev/null 2>&1; then
     javac_output="$(javac -version 2>&1 || true)"
-    javac_version="$(printf '%s\n' "$javac_output" | awk '/javac/ {print $2; exit}')"
-    javac_major="$(printf '%s\n' "$javac_version" | awk -F. '{if ($1 == "1") print $2; else print $1}')"
-    if [[ "$javac_major" =~ ^[0-9]+$ && "$javac_major" -ge 17 ]]; then
-      ok "javac $javac_version"
+    path_javac_version="$(printf '%s\n' "$javac_output" | awk '/javac/ {print $2; exit}')"
+    path_javac_major="$(printf '%s\n' "$path_javac_version" | awk -F. '{if ($1 == "1") print $2; else print $1}')"
+    if [[ "$path_javac_major" =~ ^[0-9]+$ && "$path_javac_major" -ge 17 ]]; then
+      path_javac_ok=true
     else
       first_line="$(printf '%s\n' "$javac_output" | head -1)"
-      miss "JDK 17+ is required; javac is not usable (${first_line:-no version output})"
+      path_javac_problem="javac on PATH is not JDK 17+ (${first_line:-no version output})"
     fi
   else
-    miss "JDK 17+ is required; javac is not on PATH"
+    path_javac_problem="javac is not on PATH"
+  fi
+
+  if [[ "$path_java_ok" == true && "$path_javac_ok" == true ]]; then
+    ok "Java runtime $path_java_version"
+    ok "javac $path_javac_version"
+  else
+    detected_jdk_home="$(detect_jdk_home || true)"
+    if [[ -n "$detected_jdk_home" ]]; then
+      detected_jdk_version="$(java_version "$detected_jdk_home/bin/java")"
+      detected_javac_version="$(javac_version "$detected_jdk_home/bin/javac")"
+      ok "JDK $detected_jdk_version found at $detected_jdk_home"
+      warn "java/javac are not fully usable from PATH (${path_java_problem:-java OK}; ${path_javac_problem:-javac OK}); run Gradle with JAVA_HOME='$detected_jdk_home' if your shell cannot find Java"
+    else
+      if [[ "$path_java_ok" == true ]]; then
+        ok "Java runtime $path_java_version"
+      else
+        miss "JDK 17+ required; $path_java_problem"
+      fi
+      if [[ "$path_javac_ok" == true ]]; then
+        ok "javac $path_javac_version"
+      else
+        miss "JDK 17+ is required; $path_javac_problem"
+      fi
+    fi
   fi
 
   gradle_java_home="$(awk -F= '/^org.gradle.java.home=/ {print $2}' "$ROOT_DIR/sample/gradle.properties" 2>/dev/null || true)"

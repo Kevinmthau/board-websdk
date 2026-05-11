@@ -19,30 +19,35 @@ If the check reports missing tools, SDKs, or local dependencies, stop before doi
 ## Repo Map
 
 - `README.md`: Canonical SDK handoff and workflow documentation.
-- `example/`: Vite + TypeScript starter. Prefer this as the fork point for games.
+- `scripts/create-game.sh`: First-class game scaffold command. Use this to create sibling game projects with unique app identity.
+- `example/`: Vite + TypeScript starter copied into generated games as `web/`.
 - `harrishill-board-sdk-0.1.0.tgz`: Local npm package used by `example/package.json`.
 - `board-sdk/`: Flat ESM and `.d.ts` SDK files for non-bundler integrations.
-- `sample/`: Android harness Gradle project that bakes `example/dist` into an APK.
+- `sample/`: Generic vendor Android harness Gradle project. Keep it as the SDK test harness only; do not use its package identity for real games.
 - `board-web-sdk-harness-debug.apk`: Prebuilt harness APK with the bundled example.
 - `skills/board-web-sdk/`: Repo-local Codex skill for building with this SDK.
 
 ## Game Workflow
 
-1. Read `README.md`, `example/src/main.ts`, and the relevant `board-sdk/*.d.ts` files before changing SDK usage.
-2. Keep game code TypeScript/ESM-compatible unless the user asks for another stack.
-3. Import SDK APIs from `@harrishill/board-sdk` when using a bundler.
-4. Always guard SDK calls with `Board.isOnDevice`. In normal browsers, Board APIs throw because the native bridge is absent.
-5. Keep browser preview useful off-device for layout, game UI, and syntax checks. Simulate input only in app code, never by pretending the bridge exists.
-6. Treat `Board.input.subscribe` as a frame stream. Contacts persist across frames; diff by `contactId` and `phase`, and filter `BoardContactType.Glyph` for physical pieces.
-7. Use `Board.bridgeVersion ?? 0` to gate newer host-bridge features.
-8. Preserve `vite.config.ts` relative asset behavior so Android asset loading keeps working.
+1. Run the local preflight for game work.
+2. Create real games with `./scripts/create-game.sh --name "Game Name" --slug game-slug --package com.yourname.gameslug`. This creates `../<slug>/web/`, `../<slug>/android/`, `../<slug>/vendor/`, and `../<slug>/README.md`.
+3. Do not turn `sample/` into a real game package. `sample/` is only the generic SDK harness and keeps the vendor test identity.
+4. Treat Android app identity as the package/application id, not the display label. Changing only the label does not create a distinct APK install identity.
+5. Read `README.md`, `example/src/main.ts`, and the relevant `board-sdk/*.d.ts` files before changing SDK usage.
+6. Keep game code TypeScript/ESM-compatible unless the user asks for another stack.
+7. Import SDK APIs from `@harrishill/board-sdk` when using a bundler.
+8. Always guard SDK calls with `Board.isOnDevice`. In normal browsers, Board APIs throw because the native bridge is absent.
+9. Keep browser preview useful off-device for layout, game UI, and syntax checks. Simulate input only in app code, never by pretending the bridge exists.
+10. Treat `Board.input.subscribe` as a frame stream. Contacts persist across frames; diff by `contactId` and `phase`, and filter `BoardContactType.Glyph` for physical pieces.
+11. Use `Board.bridgeVersion ?? 0` to gate newer host-bridge features.
+12. Preserve `vite.config.ts` relative asset behavior so Android asset loading keeps working.
 
 ## Verification
 
-- Browser build: `cd example && npm run build`
+- Generated browser build: `cd ../<slug>/web && npm run build`
 - Browser dev server: `cd example && npm run dev`
-- Harness APK: build the web app first, then `cd sample && ./gradlew assembleDebug`
+- Generated APK: build the web app first, then `cd ../<slug>/android && ./gradlew assembleDebug`
 - Raw bridge harness: `cd sample && ./gradlew assembleDebug -Pweb=raw`
-- Install APK: `adb install sample/app/build/outputs/apk/debug/app-debug.apk`
+- Install generated APK: `adb install ../<slug>/android/app/build/outputs/apk/debug/app-debug.apk`
 
 If verification fails because local software is missing, run the preflight script again and prompt the user with the missing items.

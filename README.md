@@ -18,11 +18,37 @@ Anywhere `window.BoardSDK` is present, `Board.isOnDevice` is `true` and the SDK 
 
 | Path | What it is |
 |---|---|
-| `example/` | Vite + TypeScript starter project. Use this as your fork point — every SDK namespace (input, session, save, pause) is wired up in `src/main.ts` for reference. |
-| `harrishill-board-sdk-0.1.0.tgz` | The SDK as an npm tarball. `example/`'s `package.json` already references it via `file:../harrishill-board-sdk-0.1.0.tgz`. |
+| `example/` | Vite + TypeScript starter project. `scripts/create-game.sh` copies this into a new game's `web/` directory. Every SDK namespace (input, session, save, pause) is wired up in `src/main.ts` for reference. |
+| `harrishill-board-sdk-0.1.0.tgz` | The SDK as an npm tarball. `example/`'s `package.json` references it via `file:../harrishill-board-sdk-0.1.0.tgz`; generated games use `file:../vendor/harrishill-board-sdk-0.1.0.tgz`. |
 | `board-sdk/` | The same SDK as flat `.js` + `.d.ts` files, for non-bundler use (drop-in `<script type="module">`, Foundry-style modules, etc.). |
-| `sample/` | Android harness Gradle project. Bakes your `example/dist` into an APK and serves it in a WebView with the Board bridge injected. Vendored AAR under `sample/app/libs/`. |
+| `sample/` | Generic Android SDK harness Gradle project. Keep this as the vendor test harness only; do not use its package identity for a real game. Generated games receive their own copy under `../<slug>/android/`. |
+| `scripts/create-game.sh` | First-class game scaffold command. Creates a sibling game directory with unique Android package id, app label, Board app id, and web build path. |
 | `board-web-sdk-harness-debug.apk` | Pre-built APK of the harness with the included `example/` baked in. Sideload onto an arm64 Android 10+ device or arm64 emulator image to sanity-check that the SDK works end-to-end before you start iterating. |
+
+## Create a game scaffold
+
+Create real games with the scaffold command instead of editing `sample/` in place:
+
+```bash
+./scripts/create-game.sh \
+  --name "Game Name" \
+  --slug game-slug \
+  --package com.yourname.gameslug
+```
+
+This creates a sibling project next to this SDK bundle:
+
+```text
+../game-slug/
+  web/
+  android/
+  vendor/
+  README.md
+```
+
+The generated Android project gets `applicationId` and `namespace` set to the package id, the Java package moved to the same package, the app label set to the display name, and `BoardNativePlugin.setAppId(...)` set to the slug. The Android build copies from `../game-slug/web/dist` by default.
+
+Android app identity is the package/application id, not the display label. Changing only `android:label` makes the launcher name different, but Android still treats APKs with the same `applicationId` as the same app.
 
 ## Two ways to develop
 
@@ -42,27 +68,27 @@ The bridge only exists inside a Board WebView. Two paths:
 
 1. **Pre-built harness APK.** Install `board-web-sdk-harness-debug.apk` on an arm64 Android 10+ device or arm64 emulator image. The bundled example will load with `Board.isOnDevice === true`, so you can confirm bridges, touch input, and APIs all work before touching the build pipeline.
 
-2. **Your own build through the harness.** When you want to iterate on your own code:
+2. **Your own generated game build.** When you want to iterate on your own code:
 
    ```bash
    # 1. Build your web app
-   cd example          # or your fork of it
+   cd ../game-slug/web
    npm install
-   npm run build       # produces example/dist
+   npm run build       # produces web/dist
 
-   # 2. Build the harness — it copies example/dist into APK assets
-   cd ../sample
+   # 2. Build this game's Android wrapper — it copies web/dist into APK assets
+   cd ../android
    ./gradlew assembleDebug
 
    # 3. Install
    adb install app/build/outputs/apk/debug/app-debug.apk
    ```
 
-   The harness expects your web app's built output at `<bundle root>/example/dist`. Either keep your project named `example/` next to `sample/`, or edit the `from '../../example/dist'` line in `sample/app/build.gradle`.
+   The generated Android wrapper expects the built web output at `../game-slug/web/dist`. `sample/` remains the generic SDK harness and should not be used as a real game's APK identity.
 
-   The harness APK is arm64-only because the bundled native bridge AAR ships `arm64-v8a` libraries. The default x86_64 Android Emulator cannot install it unless matching x86_64 native artifacts are added.
+   The Android wrapper APK is arm64-only because the bundled native bridge AAR ships `arm64-v8a` libraries. The default x86_64 Android Emulator cannot install it unless matching x86_64 native artifacts are added.
 
-   Set `-Pweb=raw` on the Gradle command to load `sample/app/src/main/assets/index.html` (a hand-rolled tabbed test page) instead of your built example — useful for poking the bridge directly without the TS SDK in the middle.
+   Set `-Pweb=raw` on the Gradle command to load `android/app/src/main/assets/index.html` (a hand-rolled tabbed test page) instead of your built web app — useful for poking the bridge directly without the TS SDK in the middle.
 
 3. **A real Board device.** Same as option 2, but the host OS provides the bridge — you don't need the harness APK at all once the device-side WebView host is wired to load your build.
 
@@ -132,7 +158,7 @@ if ((Board.bridgeVersion ?? 0) >= 2) {
 
 - Node 18+ (build toolchain)
 - Any modern ESM-compatible bundler (Vite, webpack 5, esbuild, rollup, Parcel) — the example uses Vite
-- For the harness build: JDK 17, Android SDK with `compileSdk 34`, Gradle is wrapped in `sample/gradlew`
+- For Android builds: JDK 17, Android SDK with `compileSdk 34`, Gradle is wrapped in `sample/gradlew` and generated `android/gradlew`
 - A Board device, the bundled harness APK, or the browser preview, for runtime
 
 ## Documentation
