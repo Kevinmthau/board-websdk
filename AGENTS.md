@@ -40,6 +40,7 @@ If the check reports missing tools, SDKs, or local dependencies, stop before doi
 9. Always guard SDK calls with `Board.isOnDevice`. In normal browsers, Board APIs throw because the native bridge is absent.
 10. Keep browser preview useful off-device for layout, game UI, and syntax checks. Simulate gameplay input in app code, never by pretending the bridge exists or forcing `Board.isOnDevice`.
 11. Treat `Board.input.subscribe` as a frame stream. Contacts persist across frames; maintain live physical pieces by `contactId` and `phase`, filter `BoardContactType.Glyph`, and treat `glyphId` only as the piece/type id.
+    Do not handle physical pieces like finger taps, pointer events, or one-shot touch events; pieces are persistent glyph contacts tracked across frames by `contactId`.
 12. Use `Board.bridgeVersion ?? 0` to gate newer host-bridge features.
 13. Preserve `vite.config.ts` relative asset behavior so Android asset loading from `https://appassets.androidplatform.net/...` keeps working.
 14. Preserve the Android wrapper setup order: initialize `BoardNativePlugin` context and app id, load `model.tflite`, activate `RawDataGlyphDetector`, then create/register the WebView bridge and touch channel.
