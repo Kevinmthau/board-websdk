@@ -200,6 +200,7 @@ if need_harness; then
   path_javac_ok=false
   path_java_problem=""
   path_javac_problem=""
+  gradle_java_home="$(awk -F= '/^org.gradle.java.home=/ {print $2}' "$ROOT_DIR/sample/gradle.properties" 2>/dev/null || true)"
 
   if command -v java >/dev/null 2>&1; then
     major="$(java_major)"
@@ -235,8 +236,12 @@ if need_harness; then
     if [[ -n "$detected_jdk_home" ]]; then
       detected_jdk_version="$(java_version "$detected_jdk_home/bin/java")"
       detected_javac_version="$(javac_version "$detected_jdk_home/bin/javac")"
-      ok "JDK $detected_jdk_version found at $detected_jdk_home"
-      warn "java/javac are not fully usable from PATH (${path_java_problem:-java OK}; ${path_javac_problem:-javac OK}); run Gradle with JAVA_HOME='$detected_jdk_home' if your shell cannot find Java"
+      if [[ -n "${JAVA_HOME:-}" && "$JAVA_HOME" == "$detected_jdk_home" ]]; then
+        ok "JDK $detected_jdk_version found at JAVA_HOME: $detected_jdk_home"
+        warn "java/javac are not fully usable from PATH (${path_java_problem:-java OK}; ${path_javac_problem:-javac OK}); Gradle will use JAVA_HOME"
+      else
+        action "JDK 17+ found at $detected_jdk_home, but Gradle will not use it by default; prompt before running: export JAVA_HOME='$detected_jdk_home'"
+      fi
     else
       if [[ "$path_java_ok" == true ]]; then
         ok "Java runtime $path_java_version"
@@ -251,7 +256,6 @@ if need_harness; then
     fi
   fi
 
-  gradle_java_home="$(awk -F= '/^org.gradle.java.home=/ {print $2}' "$ROOT_DIR/sample/gradle.properties" 2>/dev/null || true)"
   if [[ -n "$gradle_java_home" ]]; then
     if [[ ! -d "$gradle_java_home" ]]; then
       miss "sample/gradle.properties points org.gradle.java.home to a missing path: $gradle_java_home"
