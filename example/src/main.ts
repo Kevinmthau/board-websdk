@@ -1,4 +1,14 @@
-import { Board, BoardContactType } from "@harrishill/board-sdk";
+import {
+  Board,
+  BoardContactPhase,
+  BoardContactType,
+  type BoardContact,
+} from "@harrishill/board-sdk";
+
+type SurfaceContact = Pick<
+  BoardContact,
+  "contactId" | "x" | "y" | "orientation" | "type" | "phase" | "glyphId" | "isTouched"
+>;
 
 // -----------------------------------------------------------------------------
 // Status header: always renders, even off-device.
@@ -17,13 +27,13 @@ renderStatus();
 
 if (!Board.isOnDevice) {
   document.body.classList.add("offline");
+  wireTouchCanvas("simulated");
   console.info(
-    "Not running on a Board. Install the harness APK from ../sample/ and " +
-      "point it at this page (or drop the built dist/ into its assets) to see " +
-      "the SDK live.",
+    "Not running on a Board. Browser preview uses simulated app input only; " +
+      "Board.isOnDevice stays false and bridge-backed SDK APIs remain disabled.",
   );
 } else {
-  wireTouchCanvas();
+  wireTouchCanvas("board");
   wireSession();
   wireSaves();
   wirePauseMenu();
@@ -33,43 +43,137 @@ if (!Board.isOnDevice) {
 // Touch / piece input: draw contacts on a full-screen canvas.
 // -----------------------------------------------------------------------------
 
-function wireTouchCanvas(): void {
+function wireTouchCanvas(source: "board" | "simulated"): void {
   const canvas = document.getElementById("touch-canvas") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
+  const fingerContacts = new Map<number, SurfaceContact>();
+  const glyphContacts = new Map<number, SurfaceContact>();
 
   function resize(): void {
     canvas.width = canvas.clientWidth * devicePixelRatio;
     canvas.height = canvas.clientHeight * devicePixelRatio;
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    draw();
   }
   resize();
   window.addEventListener("resize", resize);
 
-  Board.input.subscribe((contacts) => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function applyFrame(contacts: ReadonlyArray<SurfaceContact>): void {
     for (const c of contacts) {
-      const isPiece = c.type === BoardContactType.Glyph;
-      ctx.fillStyle = isPiece ? "rgba(255, 107, 157, 0.85)" : "rgba(0, 210, 255, 0.85)";
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, isPiece ? 28 : 20, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (isPiece) {
-        // Indicate orientation with a short line from center.
-        const rad = (c.orientation * Math.PI) / 180;
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(c.x, c.y);
-        ctx.lineTo(c.x + Math.cos(rad) * 28, c.y + Math.sin(rad) * 28);
-        ctx.stroke();
-
-        ctx.fillStyle = "#fff";
-        ctx.font = "13px ui-monospace, monospace";
-        ctx.fillText(`#${c.glyphId}`, c.x + 34, c.y + 4);
+      const map = c.type === BoardContactType.Glyph ? glyphContacts : fingerContacts;
+      if (c.phase === BoardContactPhase.Ended || c.phase === BoardContactPhase.Canceled) {
+        map.delete(c.contactId);
+      } else {
+        map.set(c.contactId, c);
       }
     }
+    draw();
+  }
+
+  function draw(): void {
+    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    for (const c of fingerContacts.values()) {
+      drawContact(c);
+    }
+    for (const c of glyphContacts.values()) {
+      drawContact(c);
+    }
+  }
+
+  function drawContact(c: SurfaceContact): void {
+    const isPiece = c.type === BoardContactType.Glyph;
+    ctx.fillStyle = isPiece ? "rgba(255, 107, 157, 0.85)" : "rgba(0, 210, 255, 0.85)";
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, isPiece ? 28 : 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (!isPiece) {
+      return;
+    }
+
+    const rad = (c.orientation * Math.PI) / 180;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y);
+    ctx.lineTo(c.x + Math.cos(rad) * 28, c.y + Math.sin(rad) * 28);
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "13px ui-monospace, monospace";
+    ctx.fillText(`glyph ${c.glyphId} / contact ${c.contactId}`, c.x + 34, c.y + 4);
+  }
+
+  if (source === "board") {
+    Board.input.subscribe(applyFrame);
+  } else {
+    wireBrowserPieceSimulation(canvas, applyFrame);
+  }
+}
+
+function wireBrowserPieceSimulation(
+  canvas: HTMLCanvasElement,
+  applyFrame: (contacts: ReadonlyArray<SurfaceContact>) => void,
+): void {
+  const simulatedContactId = 1;
+  const simulatedGlyphId = 1;
+  let activeContact: SurfaceContact | null = null;
+  let animationFrame = 0;
+
+  function contactFromPointer(event: PointerEvent, phase: BoardContactPhase): SurfaceContact {
+    const rect = canvas.getBoundingClientRect();
+    const previousOrientation = activeContact?.orientation ?? 0;
+    return {
+      contactId: simulatedContactId,
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      orientation: (previousOrientation + (phase === BoardContactPhase.Moved ? 4 : 0)) % 360,
+      type: BoardContactType.Glyph,
+      phase,
+      glyphId: simulatedGlyphId,
+      isTouched: true,
+    };
+  }
+
+  function emitStationaryFrames(): void {
+    if (activeContact) {
+      activeContact = {
+        ...activeContact,
+        phase: BoardContactPhase.Stationary,
+      };
+      applyFrame([activeContact]);
+      animationFrame = requestAnimationFrame(emitStationaryFrames);
+    }
+  }
+
+  canvas.addEventListener("pointerdown", (event) => {
+    canvas.setPointerCapture(event.pointerId);
+    activeContact = contactFromPointer(event, BoardContactPhase.Began);
+    applyFrame([activeContact]);
+    cancelAnimationFrame(animationFrame);
+    animationFrame = requestAnimationFrame(emitStationaryFrames);
   });
+
+  canvas.addEventListener("pointermove", (event) => {
+    if (!activeContact) {
+      return;
+    }
+    activeContact = contactFromPointer(event, BoardContactPhase.Moved);
+    applyFrame([activeContact]);
+  });
+
+  function endContact(event: PointerEvent): void {
+    if (!activeContact) {
+      return;
+    }
+    const ended = contactFromPointer(event, BoardContactPhase.Ended);
+    activeContact = null;
+    cancelAnimationFrame(animationFrame);
+    applyFrame([ended]);
+  }
+
+  canvas.addEventListener("pointerup", endContact);
+  canvas.addEventListener("pointercancel", endContact);
 }
 
 // -----------------------------------------------------------------------------

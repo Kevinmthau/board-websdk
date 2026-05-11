@@ -37,7 +37,8 @@ public class BoardWebViewActivity extends Activity {
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        // Initialize Board SDK first (before WebView to avoid class loading during render)
+        // Required order: initialize Board native context/app id before creating
+        // the WebView bridge, then load and activate the glyph detector model.
         WebViewBoardContext ctx = new WebViewBoardContext();
         ctx.setActivity(this);
         BoardNativePlugin.setBoardContext(ctx);
@@ -45,7 +46,6 @@ public class BoardWebViewActivity extends Activity {
         BoardNativePlugin.initialize();
         Log.i(TAG, "Board SDK initialized");
 
-        // Load touch model and activate detection
         if (RawDataGlyphDetector.loadModel("model.tflite")) {
             Log.i(TAG, "Model loaded, activating touch detection...");
             // Match ArcadeAlt Unity settings
@@ -56,7 +56,7 @@ public class BoardWebViewActivity extends Activity {
                     true     // enableFastTracking
             );
             if (RawDataGlyphDetector.activate(params)) {
-                Log.i(TAG, "Touch detection ACTIVE (persistence=20)");
+                Log.i(TAG, "Touch detection ACTIVE (persistence=4)");
             } else {
                 Log.e(TAG, "Failed to activate touch detection");
             }
@@ -64,7 +64,7 @@ public class BoardWebViewActivity extends Activity {
             Log.e(TAG, "Failed to load touch model");
         }
 
-        // Now set up the WebView
+        // Now create the WebView and register the JavaScript bridge/touch channel.
         webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);

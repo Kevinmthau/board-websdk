@@ -15,6 +15,8 @@ Creates a sibling project next to board-websdk:
   ../<slug>/web/
   ../<slug>/android/
   ../<slug>/vendor/
+  ../<slug>/scripts/build_android.sh
+  ../<slug>/AGENTS.md
   ../<slug>/README.md
 USAGE
 }
@@ -81,12 +83,16 @@ Generated Board Web SDK game scaffold.
 - \`web/\`: Vite + TypeScript web game source copied from the SDK example.
 - \`android/\`: Android harness project with this game's package identity.
 - \`vendor/\`: Local Board Web SDK npm tarball used by \`web/package.json\`.
+- \`scripts/build_android.sh\`: Builds web + Android, copies the debug APK,
+  and can install/launch with \`bdb\`.
 
 ## Identity
 
 - Android package/application id: \`$package_id\`
 - Android display label: \`$game_name\`
 - Board app id: \`$slug\`
+- APK output path: \`Builds/Android/$slug-debug.apk\`
+- Current model path: \`android/app/src/main/assets/model.tflite\`
 
 Android treats the package/application id as the install identity. The display
 label is only the name shown to users.
@@ -94,17 +100,238 @@ label is only the name shown to users.
 ## Build
 
 \`\`\`bash
-cd web
-npm install
-npm run build
+./scripts/build_android.sh
+\`\`\`
 
-cd ../android
-./gradlew assembleDebug
+The script builds \`web/dist\`, runs the Android wrapper build, and copies the
+debug APK to \`Builds/Android/$slug-debug.apk\`. Use \`--install --launch\` to
+deploy through \`bdb\` when Board device tooling is installed.
+
+\`\`\`bash
+bdb status
+./scripts/build_android.sh --install --launch
+adb install Builds/Android/$slug-debug.apk
 \`\`\`
 
 The Android build copies \`web/dist\` into APK assets by default. Use
-\`./gradlew assembleDebug -Pweb=raw\` only for the raw bridge test page.
+\`./scripts/build_android.sh --web-target raw\` only for the raw bridge test
+page.
 EOF
+}
+
+write_project_agents() {
+    local dest="$1"
+    local game_name="$2"
+    local slug="$3"
+    local package_id="$4"
+    local file="$dest/AGENTS.md"
+
+    cat > "$file" <<'EOF'
+# __GAME_NAME__ Agent Guide
+
+## Scope
+
+These instructions apply to this generated Board Web SDK game project.
+
+## Project Identity
+
+- Android package/application id: `__PACKAGE_ID__`
+- Android display label: `__GAME_NAME__`
+- Board app id: `__SLUG__`
+- APK output path: `Builds/Android/__SLUG__-debug.apk`
+- Current model path: `android/app/src/main/assets/model.tflite`
+- WebView asset origin: `https://appassets.androidplatform.net/assets/web/index.html`
+
+Android install identity is the package/application id, not the display label.
+
+## Workflow
+
+1. Keep game code in `web/` TypeScript/ESM-compatible unless the user asks for another stack.
+2. Import Board APIs from `@harrishill/board-sdk`.
+3. Do not edit the SDK repo's `sample/` harness into this game. This project already has its own Android wrapper and app identity.
+4. Preserve `web/vite.config.ts` `base: "./"` so Android asset loading keeps working.
+5. Preserve the Android wrapper setup order: initialize `BoardNativePlugin` context and app id, load `model.tflite`, activate `RawDataGlyphDetector`, then create/register the WebView bridge and touch channel.
+
+## Board Input Rules
+
+- Always guard Board APIs with `Board.isOnDevice`; bridge-backed APIs throw in a normal browser.
+- Keep `Board.isOnDevice` truthful. Simulate browser gameplay input in app code, not by creating fake bridge globals.
+- Treat `Board.input.subscribe(...)` as a live frame stream. Stationary pieces keep reporting until `Ended`.
+- Track physical piece instances by `contactId`, never by `glyphId`.
+- Treat `glyphId` as the detected piece/type id only.
+- Filter `BoardContactType.Glyph` when handling physical pieces.
+- Use `Board.bridgeVersion ?? 0` to gate newer host-bridge features.
+
+## Build And Device Loop
+
+```bash
+./scripts/build_android.sh
+bdb status
+./scripts/build_android.sh --install --launch
+```
+
+Use `adb install Builds/Android/__SLUG__-debug.apk` as a fallback when `bdb` is unavailable.
+EOF
+
+    replace_in_file "$file" "__GAME_NAME__" "$game_name"
+    replace_in_file "$file" "__SLUG__" "$slug"
+    replace_in_file "$file" "__PACKAGE_ID__" "$package_id"
+}
+
+write_build_android_script() {
+    local dest="$1"
+    local slug="$2"
+    local package_id="$3"
+    local scripts_dir="$dest/scripts"
+    local file="$scripts_dir/build_android.sh"
+
+    mkdir -p "$scripts_dir"
+    cat > "$file" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+SLUG="__SLUG__"
+PACKAGE_ID="__PACKAGE_ID__"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUTPUT_REL="Builds/Android/${SLUG}-debug.apk"
+OUTPUT_APK="$ROOT_DIR/$OUTPUT_REL"
+BUILD_WEB=1
+INSTALL=0
+LAUNCH=0
+STATUS=0
+WEB_TARGET="web"
+
+usage() {
+    cat <<USAGE
+Usage:
+  ./scripts/build_android.sh [--install] [--launch] [--status] [--skip-web-build] [--web-target web|raw]
+
+Builds the Vite web app, assembles the Android debug APK, and copies it to:
+  $OUTPUT_REL
+
+Options:
+  --install          Install the copied APK with bdb.
+  --launch           Install, then launch $PACKAGE_ID with bdb.
+  --status           Run bdb status before install/launch.
+  --skip-web-build   Reuse the existing web/dist directory.
+  --web-target raw   Build the raw bridge test page instead of web/dist.
+USAGE
+}
+
+die() {
+    printf 'Error: %s\n' "$1" >&2
+    printf '\n' >&2
+    usage >&2
+    exit 1
+}
+
+resolve_bdb() {
+    if [ -n "${BDB_BIN:-}" ]; then
+        if [ -x "$BDB_BIN" ] || command -v "$BDB_BIN" >/dev/null 2>&1; then
+            printf '%s\n' "$BDB_BIN"
+            return 0
+        fi
+        return 1
+    fi
+
+    local candidate
+    for candidate in bdb "$ROOT_DIR/Tools/bdb" "$HOME/Desktop/bdb"; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            command -v "$candidate"
+            return 0
+        fi
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+run_bdb() {
+    local bdb
+    if ! bdb="$(resolve_bdb)"; then
+        printf 'Error: bdb was requested but was not found. Set BDB_BIN or install bdb on PATH.\n' >&2
+        exit 1
+    fi
+    "$bdb" "$@"
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --install)
+            INSTALL=1
+            shift
+            ;;
+        --launch)
+            INSTALL=1
+            LAUNCH=1
+            shift
+            ;;
+        --status)
+            STATUS=1
+            shift
+            ;;
+        --skip-web-build)
+            BUILD_WEB=0
+            shift
+            ;;
+        --web-target)
+            [ "${2:-}" != "" ] || die "--web-target requires web or raw"
+            WEB_TARGET="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            die "unknown argument: $1"
+            ;;
+    esac
+done
+
+case "$WEB_TARGET" in
+    web|raw) ;;
+    *) die "--web-target must be web or raw" ;;
+esac
+
+if [ "$WEB_TARGET" = "raw" ]; then
+    BUILD_WEB=0
+fi
+
+if [ "$STATUS" -eq 1 ]; then
+    run_bdb status
+fi
+
+if [ "$BUILD_WEB" -eq 1 ]; then
+    (cd "$ROOT_DIR/web" && npm run build)
+fi
+
+gradle_args=(assembleDebug)
+if [ "$WEB_TARGET" = "raw" ]; then
+    gradle_args+=("-Pweb=raw")
+fi
+
+(cd "$ROOT_DIR/android" && ./gradlew "${gradle_args[@]}")
+
+mkdir -p "$(dirname "$OUTPUT_APK")"
+cp "$ROOT_DIR/android/app/build/outputs/apk/debug/app-debug.apk" "$OUTPUT_APK"
+printf 'Copied APK: %s\n' "$OUTPUT_REL"
+
+if [ "$INSTALL" -eq 1 ]; then
+    run_bdb install "$OUTPUT_APK"
+fi
+
+if [ "$LAUNCH" -eq 1 ]; then
+    run_bdb launch "$PACKAGE_ID"
+fi
+EOF
+
+    replace_in_file "$file" "__SLUG__" "$slug"
+    replace_in_file "$file" "__PACKAGE_ID__" "$package_id"
+    chmod +x "$file"
 }
 
 game_name=""
@@ -238,6 +465,8 @@ replace_in_file "$activity_file" "private static final String TEST_APP_ID = \"$O
 replace_in_file "$activity_file" "BoardNativePlugin.setAppId(TEST_APP_ID);" "BoardNativePlugin.setAppId(APP_ID);"
 
 write_project_readme "$DEST" "$game_name" "$slug" "$package_id"
+write_project_agents "$DEST" "$game_name" "$slug" "$package_id"
+write_build_android_script "$DEST" "$slug" "$package_id"
 
 if grep -RqsF -e "$OLD_PACKAGE" -e "$OLD_APP_ID" "$DEST"; then
     printf 'Error: generated project still contains old SDK harness identity values.\n' >&2
@@ -247,5 +476,6 @@ fi
 printf 'Created Board Web SDK game scaffold:\n'
 printf '  %s\n\n' "$DEST"
 printf 'Next steps:\n'
-printf '  cd %s/web && npm install && npm run build\n' "$DEST"
-printf '  cd ../android && ./gradlew assembleDebug\n'
+printf '  cd %s\n' "$DEST"
+printf '  ./scripts/build_android.sh\n'
+printf '  ./scripts/build_android.sh --install --launch\n'

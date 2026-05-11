@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Opens at <http://localhost:5173>. Off-device the status panel renders `isOnDevice: false` and the interactive sections are disabled — which is expected. This mode is useful for styling, wiring up UI, and syntax-checking your SDK calls.
+Opens at <http://localhost:5173>. Off-device the status panel renders `isOnDevice: false`, bridge-backed sections are disabled, and the canvas uses separate simulated app input. Do not fake `Board.isOnDevice` or `window.BoardSDK` in browser preview code.
 
 ## Run it against a real bridge
 
@@ -24,14 +24,14 @@ The SDK bridge (`window.BoardSDK` / `window.boardTouch`) only exists inside a Bo
 npm run build
 ```
 
-Outputs to `dist/`. `vite.config.ts` uses `base: "./"` so the built HTML works whether it's loaded via `file://` from Android assets or served from any subpath.
+Outputs to `dist/`. `vite.config.ts` uses `base: "./"` so the built HTML works whether it's loaded from `https://appassets.androidplatform.net/...` in the Android wrapper or served from any subpath.
 
 ## What's in `src/main.ts`
 
 | Section | Shows |
 |---|---|
 | `renderStatus()` | Reading `Board.isOnDevice`, `Board.sdkVersion`, `Board.bridgeVersion`. |
-| `wireTouchCanvas()` | Subscribing to `Board.input`, drawing finger + piece contacts, using orientation. |
+| `wireTouchCanvas()` | Subscribing to `Board.input` on device, using browser-only simulated input off device, and tracking live pieces by `contactId`. |
 | `wireSession()` | Listing players, presenting the add-player selector, opening the profile switcher. |
 | `wireSaves()` | Listing saves, creating a throwaway save with `TextEncoder`. |
 | `wirePauseMenu()` | Configuring the system pause menu with custom buttons and audio tracks, polling for results. |

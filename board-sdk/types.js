@@ -3,7 +3,7 @@ export var BoardContactType;
 (function (BoardContactType) {
     /** A finger touch. `glyphId` will be 0. */
     BoardContactType[BoardContactType["Finger"] = 0] = "Finger";
-    /** A tracked piece (physical game piece with a glyph pattern). `glyphId` identifies the piece type. */
+    /** A tracked piece (physical game piece with a glyph pattern). `glyphId` identifies the piece type, not the physical instance. */
     BoardContactType[BoardContactType["Glyph"] = 1] = "Glyph";
 })(BoardContactType || (BoardContactType = {}));
 /**

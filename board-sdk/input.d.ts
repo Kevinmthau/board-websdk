@@ -16,7 +16,7 @@ export type TouchFrameCallback = (contacts: ReadonlyArray<BoardContact>) => void
  * Board.input.subscribe((contacts) => {
  *   for (const c of contacts) {
  *     if (c.type === BoardContactType.Glyph) {
- *       console.log(`Piece ${c.glyphId} at (${c.x}, ${c.y})`);
+ *       console.log(`contact ${c.contactId} uses glyph ${c.glyphId}`);
  *     }
  *   }
  * });
@@ -31,7 +31,8 @@ export declare const input: {
      * inference frame (~60fps) with the current set of active contacts.
      *
      * Contacts persist across frames -- a piece sitting still will appear
-     * with phase=Stationary until it is removed (phase=Ended).
+     * with phase=Stationary until it is removed (phase=Ended). Track live
+     * pieces by contactId; glyphId is only the detected piece/type id.
      */
     subscribe(callback: TouchFrameCallback): void;
     /** Remove a previously registered callback. */

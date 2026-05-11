@@ -2,7 +2,7 @@
 export declare enum BoardContactType {
     /** A finger touch. `glyphId` will be 0. */
     Finger = 0,
-    /** A tracked piece (physical game piece with a glyph pattern). `glyphId` identifies the piece type. */
+    /** A tracked piece (physical game piece with a glyph pattern). `glyphId` identifies the piece type, not the physical instance. */
     Glyph = 1
 }
 /**
@@ -28,7 +28,7 @@ export declare enum BoardContactPhase {
 }
 /** A single touch contact (finger or piece) on the Board surface. */
 export interface BoardContact {
-    /** Unique contact ID (stable across frames for the same physical contact). */
+    /** Unique contact ID, stable across frames for the same physical contact instance. Track live pieces with this value. */
     contactId: number;
     /** X position in display pixels (0 = left edge). */
     x: number;
@@ -40,7 +40,7 @@ export interface BoardContact {
     type: BoardContactType;
     /** Current lifecycle phase. */
     phase: BoardContactPhase;
-    /** Glyph class ID. 0 = finger, 1+ = piece type. */
+    /** Glyph class ID. 0 = finger, 1+ = piece type. This is not a unique physical piece instance. */
     glyphId: number;
     /** Whether the piece is being physically touched by a hand. */
     isTouched: boolean;

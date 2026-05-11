@@ -26,10 +26,12 @@ If the script reports missing software, SDKs, or local dependencies, stop before
 1. Read `README.md` for the current bundle workflow.
 2. Read `example/src/main.ts` for working SDK call patterns.
 3. Read relevant `board-sdk/*.d.ts` files before using a namespace in a new way.
-4. Use `example/` as the default fork point for games unless the user specifies another project.
-5. Import from `@harrishill/board-sdk` in bundled TypeScript/ESM apps.
-6. Keep `vite.config.ts` relative asset behavior so built output works from Android assets.
-7. Validate with `cd example && npm run build`; use the harness commands when Board bridge behavior matters.
+4. Use `scripts/create-game.sh` and generated game wrappers for real games; do not edit `sample/` into a real app identity.
+5. In a sibling generated game repo, read that game's `AGENTS.md` before editing.
+6. Use `example/` as the default fork point for games unless the user specifies another project.
+7. Import from `@harrishill/board-sdk` in bundled TypeScript/ESM apps.
+8. Keep `vite.config.ts` relative asset behavior so built output works from Android assets.
+9. Validate with `cd example && npm run build`; use the harness commands when Board bridge behavior matters.
 
 ## SDK Rules
 
@@ -41,7 +43,7 @@ import { Board, BoardContactType } from "@harrishill/board-sdk";
 if (Board.isOnDevice) {
   Board.input.subscribe((contacts) => {
     const pieces = contacts.filter((c) => c.type === BoardContactType.Glyph);
-    // Update game state from piece contactId, glyphId, x, y, orientation, phase.
+    // Update game state from piece contactId, x, y, orientation, phase.
   });
 }
 ```
@@ -49,7 +51,9 @@ if (Board.isOnDevice) {
 - Treat `Board.isOnDevice === false` as the normal browser preview path.
 - Never call Board APIs off-device unless guarded, because bridge-backed APIs throw.
 - Use browser preview for layout, game UI, and syntax checks; use a Board device or harness for bridge behavior.
+- Keep `Board.isOnDevice` truthful. Simulate browser gameplay input through app-level fallback code, not by creating fake `window.BoardSDK` or forcing device state.
 - Treat `Board.input.subscribe` as a frame stream. Contacts persist across frames; a stationary piece reports until it ends.
+- Track physical piece instances by `contactId`, never by `glyphId`; `glyphId` is only the detected piece/type id.
 - Diff by `contactId` and `phase`; filter `BoardContactType.Glyph` for physical pieces.
 - Use `Board.bridgeVersion ?? 0` to feature-gate newer host APIs.
 - Use `Board.session` for players, `Board.save` for save payloads, `Board.pause` for pause menu integration, and `Board.avatar` for player avatar images.
@@ -92,10 +96,22 @@ Install APK:
 adb install sample/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Generated game validation ladder:
+
+```bash
+cd ../game-slug
+./scripts/build_android.sh
+bdb status
+./scripts/build_android.sh --install --launch
+```
+
+Use `adb install Builds/Android/game-slug-debug.apk` as a fallback when `bdb` is unavailable.
+
 ## Gotchas
 
 - The native bridge exists only inside the Board WebView or harness. A normal browser should show an off-device path.
-- The harness loads built output from `example/dist` into `https://appassets.androidplatform.net/...`.
+- The harness loads built output from `example/dist` into `https://appassets.androidplatform.net/...`; generated wrappers load `web/dist` from the same origin.
 - Physical pieces can also create pointer-like activity in app UI. Filter the SDK contact stream by contact type, and guard canvas/UI pointer handlers as needed.
 - The Gradle wrapper is included; system Gradle is not required.
 - Android harness builds require JDK 17+ and Android SDK platform 34.
+- Generated Android wrappers must initialize `BoardNativePlugin`, set the app id, load `model.tflite`, activate `RawDataGlyphDetector`, then create/register the WebView bridge and touch channel.
