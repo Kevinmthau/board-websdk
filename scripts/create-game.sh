@@ -308,7 +308,7 @@ fi
 if [ "$BUILD_WEB" -eq 1 ]; then
     if [ ! -d "$ROOT_DIR/web/node_modules" ]; then
         printf 'Installing web dependencies...\n'
-        (cd "$ROOT_DIR/web" && npm install)
+        (cd "$ROOT_DIR/web" && npm install --include=dev)
     fi
     (cd "$ROOT_DIR/web" && npm run build)
 fi
@@ -449,7 +449,7 @@ replace_in_file "$ANDROID_DIR/app/build.gradle" "copyExampleAssets" "copyWebAsse
 replace_in_file "$ANDROID_DIR/app/build.gradle" "from '../../example/dist'" "from '../../web/dist'"
 replace_in_file "$ANDROID_DIR/app/build.gradle" "into 'src/main/assets/example'" "into 'src/main/assets/web'"
 replace_in_file "$ANDROID_DIR/app/build.gradle" "file('../../example/dist')" "file('../../web/dist')"
-replace_in_file "$ANDROID_DIR/app/build.gradle" "example/dist not found. Run: cd ../../example && npm install && npm run build" "web/dist not found. Run: cd ../../web && npm install && npm run build"
+replace_in_file "$ANDROID_DIR/app/build.gradle" "example/dist not found. Run: cd ../../example && npm install && npm run build" "web/dist not found. Run: cd ../../web && npm install --include=dev && npm run build"
 replace_in_file "$ANDROID_DIR/app/build.gradle" "webTarget == 'example'" "webTarget == 'web'"
 replace_in_file "$ANDROID_DIR/.gitignore" "copyExampleAssets" "copyWebAssets"
 replace_in_file "$ANDROID_DIR/.gitignore" "../example/" "../web/"
