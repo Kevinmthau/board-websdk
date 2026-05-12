@@ -21,8 +21,9 @@ Anywhere `window.BoardSDK` is present, `Board.isOnDevice` is `true` and the SDK 
 | `example/` | Vite + TypeScript starter project. `scripts/create-game.sh` copies this into a new game's `web/` directory. Every SDK namespace (input, session, save, pause) is wired up in `src/main.ts` for reference. |
 | `harrishill-board-sdk-0.1.0.tgz` | The SDK as an npm tarball. `example/`'s `package.json` references it via `file:../harrishill-board-sdk-0.1.0.tgz`; generated games use `file:../vendor/harrishill-board-sdk-0.1.0.tgz`. |
 | `board-sdk/` | The same SDK as flat `.js` + `.d.ts` files, for non-bundler use (drop-in `<script type="module">`, Foundry-style modules, etc.). |
-| `sample/` | Generic Android SDK harness Gradle project. Keep this as the vendor test harness only; do not use its package identity for a real game. Generated games receive their own copy under `../<slug>/android/`. |
-| `scripts/create-game.sh` | First-class game scaffold command. Creates a sibling game directory with unique Android package id, app label, Board app id, and web build path. |
+| `sample/` | Generic Android SDK harness Gradle project. Keep this as the vendor test harness only; do not use its package identity for a real game. Generated games receive their own copy under `../games/<slug>/android/`. |
+| `scripts/create-game.sh` | First-class game scaffold command. Creates a game directory under the workspace `games/` folder with unique Android package id, app label, Board app id, and web build path. |
+| `scripts/update-game-sdk.sh` | Copies a versioned SDK tarball into an existing generated game, updates `web/package.json`, and refreshes `web/package-lock.json`. |
 | `board-web-sdk-harness-debug.apk` | Pre-built APK of the harness with the included `example/` baked in. Sideload onto an arm64 Android 10+ device or arm64 emulator image to sanity-check that the SDK works end-to-end before you start iterating. |
 
 ## Create a game scaffold
@@ -36,10 +37,10 @@ Create real games with the scaffold command instead of editing `sample/` in plac
   --package com.yourname.gameslug
 ```
 
-This creates a sibling project next to this SDK bundle:
+This creates a game project in the workspace `games/` directory:
 
 ```text
-../game-slug/
+../games/game-slug/
   web/
   android/
   vendor/
@@ -48,11 +49,49 @@ This creates a sibling project next to this SDK bundle:
   README.md
 ```
 
-The generated Android project gets `applicationId` and `namespace` set to the package id, the Java package moved to the same package, the app label set to the display name, and `BoardNativePlugin.setAppId(...)` set to the slug. The Android build copies from `../game-slug/web/dist` by default.
+The generated Android project gets `applicationId` and `namespace` set to the package id, the Java package moved to the same package, the app label set to the display name, and `BoardNativePlugin.setAppId(...)` set to the slug. The Android build copies from `../games/game-slug/web/dist` by default.
 
 Generated projects also include a game-local `AGENTS.md` and `scripts/build_android.sh`. Use those from inside the game repo instead of editing this SDK bundle's `sample/` harness in place.
 
+Generated projects are intended to be their own Git repositories. `create-game.sh`
+initializes a local `main` branch and attempts an initial scaffold commit by
+default; pass `--no-git` only when you want a plain directory. Create the GitHub
+remote manually after reviewing the scaffold:
+
+```bash
+cd ../games/game-slug
+gh repo create game-slug --private --source . --remote origin --push
+```
+
+Without GitHub CLI:
+
+```bash
+git remote add origin git@github.com:<owner>/game-slug.git
+git push -u origin main
+```
+
 Android app identity is the package/application id, not the display label. Changing only `android:label` makes the launcher name different, but Android still treats APKs with the same `applicationId` as the same app.
+
+## Update a generated game's SDK
+
+Generated games vendor the SDK npm tarball in `vendor/` and reference it from
+`web/package.json`. After updating the SDK bundle's tarball, push that version
+into a game with:
+
+```bash
+./scripts/update-game-sdk.sh --game ../games/game-slug
+```
+
+If there is more than one SDK tarball in this repo, select one explicitly:
+
+```bash
+./scripts/update-game-sdk.sh \
+  --game ../games/game-slug \
+  --sdk-tarball harrishill-board-sdk-0.1.0.tgz
+```
+
+The helper updates the package lock but does not commit in the game repo. Review
+and commit the game-side changes from that game directory.
 
 ## Two ways to develop
 
@@ -75,7 +114,7 @@ The bridge only exists inside a Board WebView. Two paths:
 2. **Your own generated game build.** When you want to iterate on your own code, use the generated helper from the game root:
 
    ```bash
-   cd ../game-slug
+   cd ../games/game-slug
 
    # Build web/dist, assemble Android, and copy the APK to Builds/Android/
    ./scripts/build_android.sh
@@ -88,7 +127,7 @@ The bridge only exists inside a Board WebView. Two paths:
    adb install Builds/Android/game-slug-debug.apk
    ```
 
-   The generated Android wrapper expects the built web output at `../game-slug/web/dist`. `sample/` remains the generic SDK harness and should not be used as a real game's APK identity.
+   The generated Android wrapper expects the built web output at `../games/game-slug/web/dist`. `sample/` remains the generic SDK harness and should not be used as a real game's APK identity.
 
    The Android wrapper APK is arm64-only because the bundled native bridge AAR ships `arm64-v8a` libraries. The default x86_64 Android Emulator cannot install it unless matching x86_64 native artifacts are added.
 

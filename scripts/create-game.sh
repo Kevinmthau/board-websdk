@@ -9,15 +9,18 @@ SDK_TARBALL="harrishill-board-sdk-0.1.0.tgz"
 usage() {
     cat <<'USAGE'
 Usage:
-  ./scripts/create-game.sh --name "Game Name" --slug game-slug --package com.example.gameslug
+  ./scripts/create-game.sh --name "Game Name" --slug game-slug --package com.example.gameslug [--no-git]
 
-Creates a sibling project next to board-websdk:
-  ../<slug>/web/
-  ../<slug>/android/
-  ../<slug>/vendor/
-  ../<slug>/scripts/build_android.sh
-  ../<slug>/AGENTS.md
-  ../<slug>/README.md
+Creates a project in the workspace games directory:
+  ../games/<slug>/web/
+  ../games/<slug>/android/
+  ../games/<slug>/vendor/
+  ../games/<slug>/scripts/build_android.sh
+  ../games/<slug>/AGENTS.md
+  ../games/<slug>/README.md
+
+Options:
+  --no-git    Create the directory without initializing a local Git repository.
 USAGE
 }
 
@@ -116,6 +119,32 @@ adb install Builds/Android/$slug-debug.apk
 The Android build copies \`web/dist\` into APK assets by default. Use
 \`./scripts/build_android.sh --web-target raw\` only for the raw bridge test
 page.
+
+## Version Control
+
+This generated game is intended to be its own Git repository. The scaffold
+initializes a local repo by default. Create the remote manually when you are
+ready to publish:
+
+\`\`\`bash
+gh repo create $slug --private --source . --remote origin --push
+\`\`\`
+
+Without GitHub CLI:
+
+\`\`\`bash
+git remote add origin git@github.com:<owner>/$slug.git
+git push -u origin main
+\`\`\`
+
+## Board Web SDK Updates
+
+This game vendors the Board Web SDK npm tarball in \`vendor/\` and references it
+from \`web/package.json\`. From the SDK repo, update the vendored SDK with:
+
+\`\`\`bash
+./scripts/update-game-sdk.sh --game ../games/$slug
+\`\`\`
 EOF
 }
 
@@ -140,6 +169,7 @@ These instructions apply to this generated Board Web SDK game project.
 - Board app id: `__SLUG__`
 - APK output path: `Builds/Android/__SLUG__-debug.apk`
 - Current model path: `android/app/src/main/assets/model.tflite`
+- Vendored SDK: `vendor/__SDK_TARBALL__`
 - WebView asset origin: `https://appassets.androidplatform.net/assets/web/index.html`
 
 Android install identity is the package/application id, not the display label.
@@ -171,11 +201,21 @@ bdb status
 ```
 
 Use `adb install Builds/Android/__SLUG__-debug.apk` as a fallback when `bdb` is unavailable.
+
+## SDK Updates
+
+Update the vendored Board Web SDK from the SDK repo:
+
+```bash
+cd ../../board-websdk
+./scripts/update-game-sdk.sh --game ../games/__SLUG__
+```
 EOF
 
     replace_in_file "$file" "__GAME_NAME__" "$game_name"
     replace_in_file "$file" "__SLUG__" "$slug"
     replace_in_file "$file" "__PACKAGE_ID__" "$package_id"
+    replace_in_file "$file" "__SDK_TARBALL__" "$SDK_TARBALL"
 }
 
 write_build_android_script() {
@@ -338,9 +378,69 @@ EOF
     chmod +x "$file"
 }
 
+init_game_repo() {
+    local dest="$1"
+    local game_name="$2"
+
+    if ! command -v git >/dev/null 2>&1; then
+        printf 'Git was not found; generated files are ready but no local repo was initialized.\n\n'
+        return 0
+    fi
+
+    if ! git -C "$dest" init -b main >/dev/null 2>&1; then
+        if ! git -C "$dest" init >/dev/null 2>&1; then
+            printf 'Git initialization failed; generated files are ready in %s.\n\n' "$dest"
+            return 0
+        fi
+        git -C "$dest" symbolic-ref HEAD refs/heads/main >/dev/null 2>&1 || \
+            git -C "$dest" branch -M main >/dev/null 2>&1 || true
+    fi
+
+    if ! git -C "$dest" add . >/dev/null 2>&1; then
+        printf 'Git repository was initialized, but files could not be staged automatically.\n\n'
+        return 0
+    fi
+
+    if git -C "$dest" commit -m "Create $game_name scaffold" >/dev/null 2>&1; then
+        printf 'Initialized local Git repository with an initial scaffold commit.\n\n'
+        return 0
+    fi
+
+    printf 'Initialized local Git repository and staged files, but the initial commit was not created.\n'
+    printf 'If Git user identity is missing, finish with:\n'
+    printf '  cd %s\n' "$dest"
+    printf '  git config user.name "Your Name"\n'
+    printf '  git config user.email "you@example.com"\n'
+    printf '  git commit -m "Create %s scaffold"\n\n' "$game_name"
+}
+
+print_remote_steps() {
+    local dest="$1"
+    local slug="$2"
+
+    printf 'Manual remote setup:\n'
+    printf '  cd %s\n' "$dest"
+    printf '  gh repo create %s --private --source . --remote origin --push\n\n' "$slug"
+    printf 'Without GitHub CLI:\n'
+    printf '  git remote add origin git@github.com:<owner>/%s.git\n' "$slug"
+    printf '  git push -u origin main\n'
+}
+
+print_local_git_steps() {
+    local dest="$1"
+    local game_name="$2"
+
+    printf 'Local Git setup when you want this game to become a repo:\n'
+    printf '  cd %s\n' "$dest"
+    printf '  git init -b main\n'
+    printf '  git add .\n'
+    printf '  git commit -m "Create %s scaffold"\n' "$game_name"
+}
+
 game_name=""
 slug=""
 package_id=""
+init_git=1
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -358,6 +458,10 @@ while [ "$#" -gt 0 ]; do
             [ "${2:-}" != "" ] || die "--package requires a value"
             package_id="$2"
             shift 2
+            ;;
+        --no-git)
+            init_git=0
+            shift
             ;;
         -h|--help)
             usage
@@ -395,8 +499,9 @@ esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PARENT_DIR="$(cd "$REPO_ROOT/.." && pwd)"
-DEST="$PARENT_DIR/$slug"
+WORKSPACE_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
+GAMES_DIR="$WORKSPACE_ROOT/games"
+DEST="$GAMES_DIR/$slug"
 WEB_DIR="$DEST/web"
 ANDROID_DIR="$DEST/android"
 VENDOR_DIR="$DEST/vendor"
@@ -409,6 +514,7 @@ if [ -e "$DEST" ]; then
     die "destination already exists: $DEST"
 fi
 
+mkdir -p "$GAMES_DIR"
 mkdir -p "$DEST" "$VENDOR_DIR"
 copy_tree "$REPO_ROOT/example" "$WEB_DIR"
 copy_tree "$REPO_ROOT/sample" "$ANDROID_DIR"
@@ -479,7 +585,20 @@ fi
 
 printf 'Created Board Web SDK game scaffold:\n'
 printf '  %s\n\n' "$DEST"
+
+if [ "$init_git" -eq 1 ]; then
+    init_game_repo "$DEST" "$game_name"
+else
+    printf 'Skipped local Git repository initialization because --no-git was provided.\n\n'
+fi
+
 printf 'Next steps:\n'
 printf '  cd %s\n' "$DEST"
 printf '  ./scripts/build_android.sh\n'
 printf '  ./scripts/build_android.sh --install --launch\n'
+printf '\n'
+if [ "$init_git" -eq 1 ]; then
+    print_remote_steps "$DEST" "$slug"
+else
+    print_local_git_steps "$DEST" "$game_name"
+fi

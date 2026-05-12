@@ -27,11 +27,13 @@ If the script reports missing software, SDKs, or local dependencies, stop before
 2. Read `example/src/main.ts` for working SDK call patterns.
 3. Read relevant `board-sdk/*.d.ts` files before using a namespace in a new way.
 4. Use `scripts/create-game.sh` and generated game wrappers for real games; do not edit `sample/` into a real app identity.
-5. In a sibling generated game repo, read that game's `AGENTS.md` before editing.
-6. Use `example/` as the default fork point for games unless the user specifies another project.
-7. Import from `@harrishill/board-sdk` in bundled TypeScript/ESM apps.
-8. Keep `vite.config.ts` relative asset behavior so built output works from Android assets.
-9. Validate with `cd example && npm run build`; use the harness commands when Board bridge behavior matters.
+5. In a generated game repo under `../games/`, read that game's `AGENTS.md` before editing.
+6. Treat generated games as their own Git repositories; `create-game.sh` initializes a local `main` repo unless `--no-git` is used.
+7. Update a generated game's vendored SDK with `scripts/update-game-sdk.sh --game ../games/<slug>`, then review and commit from the game repo.
+8. Use `example/` as the default fork point for games unless the user specifies another project.
+9. Import from `@harrishill/board-sdk` in bundled TypeScript/ESM apps.
+10. Keep `vite.config.ts` relative asset behavior so built output works from Android assets.
+11. Validate with `cd example && npm run build`; use the harness commands when Board bridge behavior matters.
 
 ## SDK Rules
 
@@ -99,7 +101,7 @@ adb install sample/app/build/outputs/apk/debug/app-debug.apk
 Generated game validation ladder:
 
 ```bash
-cd ../game-slug
+cd ../games/game-slug
 ./scripts/build_android.sh
 bdb status
 ./scripts/build_android.sh --install --launch
