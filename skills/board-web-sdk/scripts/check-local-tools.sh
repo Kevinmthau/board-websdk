@@ -155,7 +155,7 @@ detect_android_sdk() {
     exit
   }' "$ROOT_DIR/sample/local.properties" 2>/dev/null || true)"
 
-  for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$local_properties_sdk" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
+  for candidate in "$local_properties_sdk" "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
     if [[ -n "$candidate" && -d "$candidate" ]]; then
       printf '%s\n' "$candidate"
       return 0
