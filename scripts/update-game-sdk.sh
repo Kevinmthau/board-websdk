@@ -143,7 +143,7 @@ pkg.dependencies["@harrishill/board-sdk"] = sdkSpec;
 fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
 NODE
 
-(cd "$WEB_DIR" && npm install --package-lock-only --include=dev)
+(cd "$WEB_DIR" && npm install --include=dev "@harrishill/board-sdk@$SDK_SPEC")
 
 sdk_version="${SDK_TARBALL_NAME#harrishill-board-sdk-}"
 sdk_version="${sdk_version%.tgz}"
