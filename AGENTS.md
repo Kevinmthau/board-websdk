@@ -53,8 +53,8 @@ If the check reports missing tools, SDKs, or local dependencies, stop before doi
 - Generated project helper: `cd ../games/<slug> && ./scripts/build_android.sh`
 - Generated browser build: `cd ../games/<slug>/web && npm run build`
 - Browser dev server: `cd example && npm run dev`
-- Generated APK: build the web app first, then `cd ../games/<slug>/android && ./gradlew assembleDebug`
-- Raw bridge harness: `cd sample && ./gradlew assembleDebug -Pweb=raw`
+- Generic harness: `./scripts/build-harness.sh`
+- Raw bridge harness: `./scripts/build-harness.sh --web-target raw`
 - Preferred Board-device loop: `bdb status`, then `cd ../games/<slug> && ./scripts/build_android.sh --install --launch`
 - Fallback install generated APK: `adb install ../games/<slug>/Builds/Android/<slug>-debug.apk`
 

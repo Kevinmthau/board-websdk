@@ -23,6 +23,7 @@ Anywhere `window.BoardSDK` is present, `Board.isOnDevice` is `true` and the SDK 
 | `board-sdk/` | The same SDK as flat `.js` + `.d.ts` files, for non-bundler use (drop-in `<script type="module">`, Foundry-style modules, etc.). |
 | `sample/` | Generic Android SDK harness Gradle project. Keep this as the vendor test harness only; do not use its package identity for a real game. Generated games receive their own copy under `../games/<slug>/android/`. |
 | `scripts/create-game.sh` | First-class game scaffold command. Creates a game directory under the workspace `games/` folder with unique Android package id, app label, Board app id, and web build path. |
+| `scripts/build-harness.sh` | Builds the generic `sample/` harness from this bundle and sets `JAVA_HOME` / `ANDROID_HOME` from common local installs when needed. |
 | `scripts/update-game-sdk.sh` | Copies a versioned SDK tarball into an existing generated game, updates `web/package.json`, and refreshes `web/package-lock.json`. |
 | `board-web-sdk-harness-debug.apk` | Pre-built APK of the harness with the included `example/` baked in. Sideload onto an arm64 Android 10+ device or arm64 emulator image to sanity-check that the SDK works end-to-end before you start iterating. |
 
@@ -111,6 +112,15 @@ The bridge only exists inside a Board WebView. Two paths:
 
 1. **Pre-built harness APK.** Install `board-web-sdk-harness-debug.apk` on an arm64 Android 10+ device or arm64 emulator image. The bundled example will load with `Board.isOnDevice === true`, so you can confirm bridges, touch input, and APIs all work before touching the build pipeline.
 
+   To rebuild the generic harness from this bundle, use the helper from the SDK repo root:
+
+   ```bash
+   ./scripts/build-harness.sh
+   ./scripts/build-harness.sh --web-target raw
+   ```
+
+   The helper builds the Vite example when needed and detects common local JDK and Android SDK installs before invoking Gradle.
+
 2. **Your own generated game build.** When you want to iterate on your own code, use the generated helper from the game root:
 
    ```bash
@@ -131,7 +141,7 @@ The bridge only exists inside a Board WebView. Two paths:
 
    The Android wrapper APK is arm64-only because the bundled native bridge AAR ships `arm64-v8a` libraries. The default x86_64 Android Emulator cannot install it unless matching x86_64 native artifacts are added.
 
-   Use `./scripts/build_android.sh --web-target raw` or set `-Pweb=raw` on the Gradle command to load `android/app/src/main/assets/index.html` (a hand-rolled tabbed test page) instead of your built web app — useful for poking the bridge directly without the TS SDK in the middle.
+   Use `./scripts/build_android.sh --web-target raw` to load `android/app/src/main/assets/index.html` (a hand-rolled tabbed test page) instead of your built web app — useful for poking the bridge directly without the TS SDK in the middle.
 
 3. **A real Board device.** Same as option 2, but the host OS provides the bridge — you don't need the harness APK at all once the device-side WebView host is wired to load your build.
 

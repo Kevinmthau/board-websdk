@@ -2,10 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
-// URL selection for the harness WebView.
-//   ./gradlew assembleDebug                 -> loads the example (default)
-//   ./gradlew assembleDebug -Pweb=raw       -> loads the raw-bridge tester
-//   ./gradlew assembleDebug -Pweb=example   -> loads the example (explicit)
+// URL selection for the harness WebView. From the repository root:
+//   ./scripts/build-harness.sh                       -> loads the example (default)
+//   ./scripts/build-harness.sh --web-target raw      -> loads the raw-bridge tester
+//   ./scripts/build-harness.sh --web-target example  -> loads the example (explicit)
 def webTarget = (project.findProperty('web') ?: 'example').toString()
 def webUrl = webTarget == 'raw'
         ? '/assets/index.html'

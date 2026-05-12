@@ -79,17 +79,13 @@ npm run build
 Harness APK:
 
 ```bash
-cd example
-npm run build
-cd ../sample
-./gradlew assembleDebug
+./scripts/build-harness.sh
 ```
 
 Raw bridge tester:
 
 ```bash
-cd sample
-./gradlew assembleDebug -Pweb=raw
+./scripts/build-harness.sh --web-target raw
 ```
 
 Install APK:
@@ -115,5 +111,6 @@ Use `adb install Builds/Android/game-slug-debug.apk` as a fallback when `bdb` is
 - The harness loads built output from `example/dist` into `https://appassets.androidplatform.net/...`; generated wrappers load `web/dist` from the same origin.
 - Physical pieces can also create pointer-like activity in app UI. Filter the SDK contact stream by contact type, and guard canvas/UI pointer handlers as needed.
 - The Gradle wrapper is included; system Gradle is not required.
+- Use the harness and generated game build helpers instead of invoking Gradle directly; they detect common local JDK and Android SDK installs before running Gradle.
 - Android harness builds require JDK 17+ and Android SDK platform 34.
 - Generated Android wrappers must initialize `BoardNativePlugin`, set the app id, load `model.tflite`, activate `RawDataGlyphDetector`, then create/register the WebView bridge and touch channel.

@@ -282,7 +282,8 @@ if need_harness; then
         ok "JDK $detected_jdk_version found at JAVA_HOME: $detected_jdk_home"
         warn "java/javac are not fully usable from PATH (${path_java_problem:-java OK}; ${path_javac_problem:-javac OK}); Gradle will use JAVA_HOME"
       else
-        action "JDK 17+ found at $detected_jdk_home, but Gradle will not use it by default; prompt before running: export JAVA_HOME='$detected_jdk_home'"
+        ok "JDK $detected_jdk_version found at $detected_jdk_home"
+        warn "java/javac are not fully usable from PATH (${path_java_problem:-java OK}; ${path_javac_problem:-javac OK}); build helpers set JAVA_HOME automatically"
       fi
     else
       if [[ "$gradlew_java_ok" == true && ( -z "${JAVA_HOME:-}" || "$java_home_jdk_ok" == true ) ]]; then
@@ -348,6 +349,14 @@ if need_harness; then
     action "sample/gradlew exists but is not executable; prompt before running: chmod +x sample/gradlew"
   else
     miss "sample/gradlew is missing"
+  fi
+
+  if [[ -x "$ROOT_DIR/scripts/build-harness.sh" ]]; then
+    ok "Harness build helper is executable"
+  elif [[ -f "$ROOT_DIR/scripts/build-harness.sh" ]]; then
+    action "scripts/build-harness.sh exists but is not executable; prompt before running: chmod +x scripts/build-harness.sh"
+  else
+    miss "scripts/build-harness.sh is missing"
   fi
 
   if [[ -f "$ROOT_DIR/sample/app/libs/board-webview-general-debug.aar" ]]; then

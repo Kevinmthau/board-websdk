@@ -15,7 +15,7 @@ Opens at <http://localhost:5173>. Off-device the status panel renders `isOnDevic
 
 The SDK bridge (`window.BoardSDK` / `window.boardTouch`) only exists inside a Board WebView. Two ways to get one on your dev machine:
 
-1. **Android harness (in this repo).** Build this example (`npm run build`), then run `cd ../sample && ./gradlew assembleDebug`. The Gradle task copies `dist/` into `sample/app/src/main/assets/example/`, which is the default harness path. The harness native bridge is arm64-only, so install the APK on an arm64 Android device or arm64 emulator image, not the default x86_64 emulator.
+1. **Android harness (in this repo).** From this directory, run `cd .. && ./scripts/build-harness.sh`. The helper builds this example and copies `dist/` into `sample/app/src/main/assets/example/`, which is the default harness path. The harness native bridge is arm64-only, so install the APK on an arm64 Android device or arm64 emulator image, not the default x86_64 emulator.
 2. **A real Board device.** Serve the built `dist/` from anywhere, point the device's browser or WebView host app at the URL.
 
 ## Build
