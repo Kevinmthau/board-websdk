@@ -145,7 +145,17 @@ detect_jdk_home() {
 }
 
 detect_android_sdk() {
-  for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
+  local candidate local_properties_sdk
+
+  local_properties_sdk="$(awk -F= '/^[[:space:]]*sdk\.dir[[:space:]]*=/ {
+    sub(/^[[:space:]]*sdk\.dir[[:space:]]*=[[:space:]]*/, "")
+    sub(/[[:space:]]*$/, "")
+    gsub(/\\ /, " ")
+    print
+    exit
+  }' "$ROOT_DIR/sample/local.properties" 2>/dev/null || true)"
+
+  for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$local_properties_sdk" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
     if [[ -n "$candidate" && -d "$candidate" ]]; then
       printf '%s\n' "$candidate"
       return 0

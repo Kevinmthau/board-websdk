@@ -109,7 +109,7 @@ label is only the name shown to users.
 
 The script builds \`web/dist\`, runs the Android wrapper build, and copies the
 debug APK to \`Builds/Android/$slug-debug.apk\`. It detects common local JDK and
-Android SDK installs before invoking Gradle, so \`JAVA_HOME\` and
+Android SDK settings before invoking Gradle, so \`JAVA_HOME\` and
 \`ANDROID_HOME\` usually do not need to be set manually. Use
 \`--install --launch\` to deploy through \`bdb\` when Board device tooling is
 installed.
@@ -363,8 +363,17 @@ detect_jdk_home() {
 }
 
 detect_android_sdk() {
-    local candidate
-    for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
+    local candidate local_properties_sdk
+
+    local_properties_sdk="$(awk -F= '/^[[:space:]]*sdk\.dir[[:space:]]*=/ {
+        sub(/^[[:space:]]*sdk\.dir[[:space:]]*=[[:space:]]*/, "")
+        sub(/[[:space:]]*$/, "")
+        gsub(/\\ /, " ")
+        print
+        exit
+    }' "$ROOT_DIR/android/local.properties" 2>/dev/null || true)"
+
+    for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$local_properties_sdk" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
         if [ -n "$candidate" ] && [ -d "$candidate" ]; then
             printf '%s\n' "$candidate"
             return 0

@@ -23,7 +23,7 @@ Anywhere `window.BoardSDK` is present, `Board.isOnDevice` is `true` and the SDK 
 | `board-sdk/` | The same SDK as flat `.js` + `.d.ts` files, for non-bundler use (drop-in `<script type="module">`, Foundry-style modules, etc.). |
 | `sample/` | Generic Android SDK harness Gradle project. Keep this as the vendor test harness only; do not use its package identity for a real game. Generated games receive their own copy under `../games/<slug>/android/`. |
 | `scripts/create-game.sh` | First-class game scaffold command. Creates a game directory under the workspace `games/` folder with unique Android package id, app label, Board app id, and web build path. |
-| `scripts/build-harness.sh` | Builds the generic `sample/` harness from this bundle and sets `JAVA_HOME` / `ANDROID_HOME` from common local installs when needed. |
+| `scripts/build-harness.sh` | Builds the generic `sample/` harness from this bundle and sets `JAVA_HOME` / `ANDROID_HOME` from project or common local SDK settings when needed. |
 | `scripts/update-game-sdk.sh` | Copies a versioned SDK tarball into an existing generated game, updates `web/package.json`, and refreshes `web/package-lock.json`. |
 | `board-web-sdk-harness-debug.apk` | Pre-built APK of the harness with the included `example/` baked in. Sideload onto an arm64 Android 10+ device or arm64 emulator image to sanity-check that the SDK works end-to-end before you start iterating. |
 
@@ -119,7 +119,7 @@ The bridge only exists inside a Board WebView. Two paths:
    ./scripts/build-harness.sh --web-target raw
    ```
 
-   The helper builds the Vite example when needed and detects common local JDK and Android SDK installs before invoking Gradle.
+   The helper builds the Vite example when needed and detects common local JDK and Android SDK settings before invoking Gradle.
 
 2. **Your own generated game build.** When you want to iterate on your own code, use the generated helper from the game root:
 
